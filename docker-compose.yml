@@ -6,12 +6,12 @@ services:
     restart: unless-stopped
     environment:
       SEEDMO_PASSWORD: "skift-mig"      # adgangskode til web-siden
-      SEEDMO_PEER_PORT: "6881"
+      SEEDMO_PEER_PORT: "51515"
       TZ: Europe/Copenhagen
     ports:
-      - "8085:8080"                     # web-siden: http://<nas-ip>:8085
-      - "6881:6881/tcp"                 # torrent-trafik
-      - "6881:6881/udp"
+      - "8095:8080"                     # web-siden: http://nas-ts864.local:8095
+      - "51515:51515/tcp"                 # torrent-trafik
+      - "51515:51515/udp"
     volumes:
       - /share/Container/seedmo/config:/config
       - /share/Download/seedmo:/downloads

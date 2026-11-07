@@ -47,12 +47,12 @@ docker compose up -d --build
 Første gang tager det et par minutter.
 
 ### 4. Åbn seedmo
-Gå til `http://<NAS'ens IP>:8085` i browseren, og log ind med din adgangskode.
+Gå til `http://nas-ts864.local:8095` (eller NAS'ens IP-adresse) i browseren, og log ind med din adgangskode.
 
 På iPhone kan du åbne samme adresse i Safari og vælge **Share → Add to Home Screen**.
 
 ### 5. Hurtigere downloads (valgfrit)
-Åbn port **6881** (både TCP og UDP) i din router, og send den videre til NAS'en. seedmo virker også uden, men så kan færre peers forbinde til dig.
+Åbn port **51515** (både TCP og UDP) i din router, og send den videre til NAS'en. seedmo virker også uden, men så kan færre peers forbinde til dig.
 
 ### Opdatering
 Kopiér den nye `app`-mappe ind over den gamle, og kør `docker compose up -d --build` igen. Dine torrents og indstillinger bevares.
@@ -117,7 +117,7 @@ Det virker kun i Chrome og Firefox og kun, når seedmo åbnes via **https**, fx 
 - Python 3.12, FastAPI og libtorrent 2.1 i én Docker-container
 - Web-UI i ren HTML, CSS og JS. Skrifterne ligger lokalt, så intet hentes fra nettet
 - `/config` indeholder `settings.json`, `meta.json`, `secret.key` og `resume/` med én `.fastresume` pr. torrent
-- Miljøvariabler: `SEEDMO_PASSWORD`, `SEEDMO_PEER_PORT` (6881), `SEEDMO_CONFIG`, `SEEDMO_DOWNLOADS`
+- Miljøvariabler: `SEEDMO_PASSWORD`, `SEEDMO_PEER_PORT` (51515 i opsætningen, 6881 som standard), `SEEDMO_CONFIG`, `SEEDMO_DOWNLOADS`
 - Billedet er bygget til Intel/AMD (linux/amd64)
 
 ### Lokal udvikling
