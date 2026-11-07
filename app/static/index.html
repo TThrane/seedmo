@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>seedmo</title>
+<meta name="theme-color" content="#0b0d11">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect x='4' y='4' width='8' height='8' fill='%23ff5a1f'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/static/app.css">
+<script>
+  // Sæt tema før første tegning, så siden ikke blinker
+  (function(){try{
+    var t=localStorage.getItem("seedmo.theme")||"signal",m=localStorage.getItem("seedmo.mode")||"system";
+    var dark=m==="dark"||(m==="system"&&matchMedia("(prefers-color-scheme: dark)").matches);
+    document.documentElement.dataset.theme=t+(dark?"-dark":"-light");document.documentElement.dataset.family=t;
+  }catch(e){document.documentElement.dataset.theme="signal-light";document.documentElement.dataset.family="signal";}})();
+</script>
+</head>
+<body>
+
+<div id="login" class="login hidden">
+  <form id="loginForm">
+    <div class="wordmark"><i></i>seedmo</div>
+    <input type="password" id="pw" placeholder="Adgangskode" autocomplete="current-password" required>
+    <button class="btn primary" type="submit">Log ind</button>
+    <div class="err" id="loginErr"></div>
+  </form>
+</div>
+
+<div id="app" class="app hidden">
+  <aside class="sidebar">
+    <div class="wordmark"><i></i>seedmo</div>
+    <nav class="nav" id="nav" aria-label="Filtre">
+      <div class="label">Torrents</div>
+      <button data-f="all" aria-current="true"><span>Alle</span><span class="n" data-n="all">00</span></button>
+      <button data-f="choose" class="hidden"><span>Vælg filer</span><span class="n" data-n="choose">00</span></button>
+      <button data-f="active"><span>Henter</span><span class="n" data-n="active">00</span></button>
+      <button data-f="seeding"><span>Seeder</span><span class="n" data-n="seeding">00</span></button>
+      <button data-f="done"><span>Færdige</span><span class="n" data-n="done">00</span></button>
+      <button data-f="paused"><span>På pause</span><span class="n" data-n="paused">00</span></button>
+      <button data-f="error"><span>Fejl</span><span class="n" data-n="error">00</span></button>
+    </nav>
+    <div class="side-foot">
+      <div class="label">Hastighed</div>
+      <div class="row"><span>↓</span><span id="sumDown">0 B/s</span></div>
+      <div class="row"><span>↑</span><span id="sumUp">0 B/s</span></div>
+      <div class="label" style="margin-top:6px">Disk</div>
+      <div class="disk"><b id="diskBar" style="width:0"></b></div>
+      <div class="row"><span>Fri</span><span id="diskFree">–</span></div>
+      <button class="settings-btn" id="openSettings">Indstillinger</button>
+    </div>
+  </aside>
+
+  <section class="list">
+    <div class="list-head">
+      <h1 id="listTitle">Alle</h1>
+      <form class="addbar" id="addForm">
+        <input id="addLink" placeholder="Indsæt magnet-link eller URL" autocomplete="off" aria-label="Magnet-link eller URL">
+        <button class="btn primary" type="submit">Tilføj</button>
+      </form>
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <button class="linkbtn" id="pickFile" type="button">+ .torrent-fil</button>
+        <span class="label" id="countLabel"></span>
+      </div>
+      <input type="file" id="fileInput" accept=".torrent,application/x-bittorrent" multiple class="hidden">
+    </div>
+    <div class="rows" id="rows"></div>
+  </section>
+
+  <section class="detail mobile-hidden" id="detail">
+    <div class="placeholder">Vælg en torrent</div>
+  </section>
+</div>
+
+<dialog id="settings">
+  <form method="dialog" class="dlg" id="settingsForm">
+    <h3 tabindex="-1" autofocus>Indstillinger</h3>
+    <div class="group">
+      <div class="label">Hastighed</div>
+      <div class="field"><div>Download-grænse<small>KB/s · 0 = ubegrænset</small></div><input type="number" min="0" step="50" name="download_limit_kb"></div>
+      <div class="field"><div>Upload-grænse<small>KB/s · 0 = ubegrænset</small></div><input type="number" min="0" step="50" name="upload_limit_kb"></div>
+      <label class="check"><input type="checkbox" name="limit_lan"><span>Begræns også trafik på eget netværk<br><small style="color:var(--muted)">Normalt gælder grænserne kun internettet</small></span></label>
+      <div class="field"><div>Aktive downloads<small>Resten står i kø</small></div><input type="number" min="1" max="20" name="max_active_downloads"></div>
+    </div>
+    <div class="group">
+      <div class="label">Seeding</div>
+      <div class="field"><div>Stop ved ratio<small>1 = del lige så meget som hentet · 0 = stop straks · −1 = aldrig</small></div><input type="number" step="0.1" min="-1" name="seed_ratio_limit"></div>
+      <div class="field"><div>Stop efter tid<small>Minutter · 0 = ingen tidsgrænse</small></div><input type="number" min="0" step="10" name="seed_time_limit_min"></div>
+    </div>
+    <div class="group">
+      <div class="label">Nye torrents</div>
+      <label class="check"><input type="checkbox" name="start_paused"><span>Vælg filer, før der hentes<br><small style="color:var(--muted)">Fillisten vises, og intet hentes, før du har valgt</small></span></label>
+    </div>
+    <div class="group">
+      <div class="label">Udseende</div>
+      <div class="field"><div>Tema</div>
+        <select id="themeSel"><option value="signal">Signal</option><option value="papir">Papir</option><option value="instrument">Instrument</option><option value="moderne">Moderne</option></select></div>
+      <div class="field"><div>Lys eller mørk</div>
+        <select id="modeSel"><option value="system">Følg systemet</option><option value="light">Lys</option><option value="dark">Mørk</option></select></div>
+    </div>
+    <div class="group">
+      <div class="label">Magnet-links</div>
+      <div style="font-size:13px">Lad browseren åbne magnet-links direkte i seedmo.</div>
+      <div><button class="btn" type="button" id="regHandler">Brug seedmo til magnet-links</button></div>
+    </div>
+    <div class="dlg-foot">
+      <button class="btn" type="button" id="logout">Log ud</button>
+      <div style="display:flex;gap:8px">
+        <button class="btn" value="cancel" formnovalidate>Annuller</button>
+        <button class="btn primary" id="saveSettings" value="save">Gem</button>
+      </div>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="confirmRemove">
+  <form method="dialog" class="dlg">
+    <h3 tabindex="-1" autofocus>Fjern torrent?</h3>
+    <div id="removeName" style="word-break:break-word"></div>
+    <label class="check"><input type="checkbox" id="removeFiles"><span>Slet også de hentede filer</span></label>
+    <div class="dlg-foot"><span></span><div style="display:flex;gap:8px">
+      <button class="btn" value="cancel">Annuller</button>
+      <button class="btn primary" value="ok">Fjern</button></div></div>
+  </form>
+</dialog>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
