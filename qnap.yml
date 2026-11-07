@@ -1,0 +1,15 @@
+services:
+  seedmo:
+    image: ghcr.io/tthrane/seedmo:latest
+    container_name: seedmo
+    restart: unless-stopped
+    environment:
+      SEEDMO_PASSWORD: "skift-mig"
+      TZ: Europe/Copenhagen
+    ports:
+      - "8085:8080"
+      - "6881:6881/tcp"
+      - "6881:6881/udp"
+    volumes:
+      - /share/Container/seedmo/config:/config
+      - /share/Download/seedmo:/downloads
