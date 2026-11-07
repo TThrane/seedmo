@@ -105,6 +105,20 @@ Vil du vælge filer, før der hentes noget, så slå **Vælg filer, før der hen
 | Stop efter tid | Antal minutter, der højst skal seedes. 0 betyder ingen tidsgrænse |
 | Tema / Lys eller mørk | Gemmes i den browser, du bruger |
 
+### To-trins-login
+Gå til **Indstillinger → To-trins-login → Slå til**. Scan QR-koden med 1Password, Google Authenticator eller en anden godkendelsesapp, og skriv den 6-cifrede kode. Derefter skal du bruge både adgangskode og kode, når du logger ind.
+
+Efter 5 forkerte forsøg bliver den pågældende adresse låst ude i 15 minutter.
+
+Mister du adgangen til appen, kan du slette filen `Container/seedmo/config/totp.json` i File Station og genstarte seedmo. Så er to-trins-login slået fra igen.
+
+### Adgang udefra (https://seedmo.thrane.dev)
+`qnap.yml` indeholder også **Caddy**, som giver seedmo en https-adresse og selv henter og fornyer certifikatet.
+- DNS: `seedmo.thrane.dev` er en CNAME til `thranets864.myqnapcloud.com` (hos Simply).
+- Routeren skal sende port **443** videre til NAS'ens port **9443** og port **80** til **9080**.
+
+Slå to-trins-login til, før du åbner for adgang udefra.
+
 ### Magnet-links direkte fra browseren
 Under **Indstillinger** kan du trykke **Brug seedmo til magnet-links**. Så åbner magnet-links på andre sider direkte i seedmo.
 
