@@ -22,6 +22,7 @@
   <form id="loginForm">
     <div class="wordmark"><i></i>seedmo</div>
     <input type="password" id="pw" placeholder="Adgangskode" autocomplete="current-password" required>
+    <input type="text" id="code" class="hidden" placeholder="Kode fra godkendelsesappen" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9 ]*">
     <button class="btn primary" type="submit">Log ind</button>
     <div class="err" id="loginErr"></div>
   </form>
@@ -99,6 +100,11 @@
         <select id="modeSel"><option value="system">Følg systemet</option><option value="light">Lys</option><option value="dark">Mørk</option></select></div>
     </div>
     <div class="group">
+      <div class="label">To-trins-login</div>
+      <div style="font-size:13px" id="tfaText">Henter …</div>
+      <div><button class="btn" type="button" id="tfaBtn">Slå til</button></div>
+    </div>
+    <div class="group">
       <div class="label">Magnet-links</div>
       <div style="font-size:13px">Lad browseren åbne magnet-links direkte i seedmo.</div>
       <div><button class="btn" type="button" id="regHandler">Brug seedmo til magnet-links</button></div>
@@ -121,6 +127,27 @@
     <div class="dlg-foot"><span></span><div style="display:flex;gap:8px">
       <button class="btn" value="cancel">Annuller</button>
       <button class="btn primary" value="ok">Fjern</button></div></div>
+  </form>
+</dialog>
+
+<dialog id="tfaSetup">
+  <form method="dialog" class="dlg" id="tfaForm">
+    <h3 tabindex="-1" autofocus id="tfaTitle">Slå to-trins-login til</h3>
+    <div id="tfaSetupBody" class="group">
+      <div style="font-size:13px">1. Scan QR-koden med 1Password, Google Authenticator eller en anden godkendelsesapp.</div>
+      <div id="tfaQr" class="qr"></div>
+      <div style="font-size:13px">Kan du ikke scanne, så indtast nøglen:</div>
+      <code id="tfaSecret" class="secret"></code>
+      <div style="font-size:13px">2. Skriv den 6-cifrede kode, som appen viser.</div>
+    </div>
+    <div id="tfaDisableBody" class="group hidden">
+      <div style="font-size:13px">Skriv den 6-cifrede kode fra din godkendelsesapp for at slå to-trins-login fra.</div>
+    </div>
+    <input type="text" id="tfaCode" class="codeinput" placeholder="000000" inputmode="numeric" autocomplete="one-time-code" maxlength="6">
+    <div class="err" id="tfaErr"></div>
+    <div class="dlg-foot"><span></span><div style="display:flex;gap:8px">
+      <button class="btn" value="cancel" formnovalidate>Annuller</button>
+      <button class="btn primary" type="submit" id="tfaOk">Bekræft</button></div></div>
   </form>
 </dialog>
 

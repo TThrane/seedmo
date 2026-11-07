@@ -173,3 +173,10 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
   .back{display:inline-block;margin-bottom:18px}
   .field{grid-template-columns:1fr}
 }
+
+.qr{background:#fff;padding:8px;border-radius:var(--r);width:max-content}
+.qr svg{display:block;width:200px;height:200px}
+.secret{font:13px/18px var(--mono);color:var(--ink);word-break:break-all;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:8px 10px;letter-spacing:.08em}
+.codeinput{font:600 22px/28px var(--mono);letter-spacing:.3em;text-align:center;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:10px;color:var(--ink);width:100%}
+#code{font-family:var(--mono);letter-spacing:.2em}
+#code:placeholder-shown{letter-spacing:0;font-family:var(--font)}

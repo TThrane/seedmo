@@ -19,6 +19,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.concurrency import run_in_threadpool
 
 from .engine import Engine
+from .security import Throttle, TwoFactor
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger("seedmo")
@@ -33,6 +34,8 @@ SESSION_DAYS = 30
 MAX_TORRENT_BYTES = 10 * 1024 * 1024
 
 engine: Engine | None = None
+twofa: TwoFactor | None = None
+throttle = Throttle()
 
 
 def _secret() -> bytes:
@@ -65,8 +68,9 @@ def _valid_token(tok: str | None) -> bool:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global engine, SECRET
+    global engine, SECRET, twofa
     SECRET = _secret()
+    twofa = TwoFactor(CONFIG_DIR)
     engine = Engine(CONFIG_DIR, DOWNLOAD_DIR, PEER_PORT)
     if not PASSWORD:
         log.warning("SEEDMO_PASSWORD er ikke sat – web-UI'et er åbent for alle på netværket")
@@ -94,20 +98,40 @@ def _err(e: Exception, code: int = 400):
 
 
 # ---------- login ----------
+def _client_ip(request: Request) -> str:
+    return request.client.host if request.client else "?"
+
+
+def _set_session(r: JSONResponse, request: Request):
+    r.set_cookie(COOKIE, _make_token(), max_age=SESSION_DAYS * 86400, httponly=True, samesite="lax",
+                 secure=request.url.scheme == "https")
+
+
 @app.get("/api/auth")
 def auth_state(request: Request):
-    return {"required": bool(PASSWORD), "ok": _valid_token(request.cookies.get(COOKIE))}
+    return {"required": bool(PASSWORD), "ok": _valid_token(request.cookies.get(COOKIE)),
+            "totp": bool(PASSWORD) and twofa.enabled}
 
 
 @app.post("/api/login")
 async def login(request: Request):
+    ip = _client_ip(request)
+    wait = throttle.locked_for(ip)
+    if wait:
+        return JSONResponse({"error": f"For mange forsøg. Prøv igen om {max(1, wait // 60)} min."}, status_code=429)
     data = await request.json()
-    if not PASSWORD or hmac.compare_digest(str(data.get("password", "")), PASSWORD):
+    pw_ok = not PASSWORD or hmac.compare_digest(str(data.get("password", "")), PASSWORD)
+    code_ok = pw_ok and twofa.verify(str(data.get("code", "")))
+    if pw_ok and code_ok:
+        throttle.ok(ip)
         r = JSONResponse({"ok": True})
-        r.set_cookie(COOKIE, _make_token(), max_age=SESSION_DAYS * 86400, httponly=True, samesite="lax")
+        _set_session(r, request)
         return r
+    throttle.fail(ip)
+    log.warning("Forkert login fra %s", ip)
     await asyncio.sleep(1.5)  # brems gætteri
-    return JSONResponse({"error": "Forkert adgangskode"}, status_code=401)
+    msg = "Forkert adgangskode eller kode" if twofa.enabled else "Forkert adgangskode"
+    return JSONResponse({"error": msg}, status_code=401)
 
 
 @app.post("/api/logout")
@@ -115,6 +139,37 @@ def logout():
     r = JSONResponse({"ok": True})
     r.delete_cookie(COOKIE)
     return r
+
+
+# ---------- to-trins-login ----------
+@app.get("/api/2fa")
+def twofa_state():
+    return {"enabled": twofa.enabled, "available": bool(PASSWORD)}
+
+
+@app.post("/api/2fa/setup")
+def twofa_setup():
+    if not PASSWORD:
+        _err(Exception("Sæt SEEDMO_PASSWORD først"))
+    if twofa.enabled:
+        _err(Exception("To-trins-login er allerede slået til"))
+    return twofa.start_setup("seedmo")
+
+
+@app.post("/api/2fa/confirm")
+async def twofa_confirm(request: Request):
+    data = await request.json()
+    if not twofa.confirm_setup(str(data.get("code", ""))):
+        _err(Exception("Koden passer ikke. Prøv den næste kode fra appen."))
+    return {"ok": True}
+
+
+@app.post("/api/2fa/disable")
+async def twofa_disable(request: Request):
+    data = await request.json()
+    if not twofa.disable(str(data.get("code", ""))):
+        _err(Exception("Koden passer ikke"))
+    return {"ok": True}
 
 
 # ---------- torrents ----------

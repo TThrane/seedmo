@@ -6,6 +6,7 @@ services:
     environment:
       SEEDMO_PASSWORD: "skift-mig"
       SEEDMO_PEER_PORT: "51515"
+      FORWARDED_ALLOW_IPS: "*"
       TZ: Europe/Copenhagen
     ports:
       - "8095:8080"
@@ -14,3 +15,18 @@ services:
     volumes:
       - /share/Container/seedmo/config:/config
       - /share/Download/seedmo:/downloads
+
+  # https://seedmo.thrane.dev – Caddy henter selv et Let's Encrypt-certifikat.
+  # Routeren skal sende port 443 (og 80) videre til NAS'ens port 9443 (og 9080).
+  caddy:
+    image: caddy:2
+    container_name: seedmo-caddy
+    restart: unless-stopped
+    command: caddy reverse-proxy --from seedmo.thrane.dev --to seedmo:8080
+    ports:
+      - "9443:443"
+      - "9080:80"
+    volumes:
+      - /share/Container/seedmo/caddy:/data
+    depends_on:
+      - seedmo

@@ -66,11 +66,17 @@ function applyTheme() {
 matchMedia("(prefers-color-scheme: dark)").addEventListener("change", applyTheme);
 
 // ---------- login ----------
-function showLogin() { $("#app").classList.add("hidden"); $("#login").classList.remove("hidden"); $("#pw").focus(); }
+function showLogin() {
+  $("#app").classList.add("hidden"); $("#login").classList.remove("hidden"); $("#pw").focus();
+  fetch("/api/auth").then(r => r.json()).then(a => { $("#code").classList.toggle("hidden", !a.totp); $("#code").required = !!a.totp; }).catch(() => {});
+}
 function showApp() { $("#login").classList.add("hidden"); $("#app").classList.remove("hidden"); }
 $("#loginForm").addEventListener("submit", async e => {
   e.preventDefault(); $("#loginErr").textContent = "";
-  try { await api("/api/login", { method: "POST", json: { password: $("#pw").value } }); $("#pw").value = ""; showApp(); refresh(); }
+  try {
+    await api("/api/login", { method: "POST", json: { password: $("#pw").value, code: $("#code").value } });
+    $("#pw").value = ""; $("#code").value = ""; showApp(); refresh();
+  }
   catch (err) { $("#loginErr").textContent = err.message; }
 });
 
@@ -336,6 +342,7 @@ $("#openSettings").addEventListener("click", async () => {
       const el = f.elements[k]; if (!el) continue;
       if (el.type === "checkbox") el.checked = !!v; else el.value = v;
     }
+    loadTfa();
     $("#themeSel").value = localStorage.getItem("seedmo.theme") || "signal";
     $("#modeSel").value = localStorage.getItem("seedmo.mode") || "system";
     $("#settings").showModal();
@@ -366,6 +373,48 @@ $("#regHandler").addEventListener("click", () => {
   catch (e) { toast("Browseren afviste: " + e.message, 5000); }
 });
 
+// ---------- to-trins-login ----------
+let tfaEnabled = false, tfaMode = "setup";
+async function loadTfa() {
+  try {
+    const t = await api("/api/2fa");
+    tfaEnabled = t.enabled;
+    $("#tfaText").textContent = !t.available ? "Kræver at der er sat en adgangskode (SEEDMO_PASSWORD)."
+      : t.enabled ? "Slået til. Du skal bruge en kode fra din godkendelsesapp, når du logger ind."
+      : "Slået fra. Slå det til, hvis seedmo kan nås fra internettet.";
+    $("#tfaBtn").textContent = t.enabled ? "Slå fra" : "Slå til";
+    $("#tfaBtn").disabled = !t.available;
+  } catch (e) { $("#tfaText").textContent = e.message; }
+}
+$("#tfaBtn").addEventListener("click", async () => {
+  const dlg = $("#tfaSetup");
+  $("#tfaErr").textContent = ""; $("#tfaCode").value = "";
+  tfaMode = tfaEnabled ? "disable" : "setup";
+  $("#tfaTitle").textContent = tfaEnabled ? "Slå to-trins-login fra" : "Slå to-trins-login til";
+  $("#tfaSetupBody").classList.toggle("hidden", tfaEnabled);
+  $("#tfaDisableBody").classList.toggle("hidden", !tfaEnabled);
+  if (!tfaEnabled) {
+    try {
+      const r = await api("/api/2fa/setup", { method: "POST" });
+      $("#tfaQr").innerHTML = r.svg;
+      $("#tfaSecret").textContent = r.secret.replace(/(.{4})/g, "$1 ").trim();
+    } catch (e) { toast(e.message); return; }
+  }
+  dlg.showModal();
+});
+$("#tfaForm").addEventListener("submit", async e => {
+  if (e.submitter && e.submitter.value === "cancel") return;
+  e.preventDefault();
+  const code = $("#tfaCode").value.replace(/\D/g, "");
+  if (code.length !== 6) { $("#tfaErr").textContent = "Skriv de 6 cifre fra appen"; return; }
+  try {
+    await api(tfaMode === "setup" ? "/api/2fa/confirm" : "/api/2fa/disable", { method: "POST", json: { code } });
+    $("#tfaSetup").close();
+    toast(tfaMode === "setup" ? "To-trins-login er slået til" : "To-trins-login er slået fra");
+    loadTfa();
+  } catch (err) { $("#tfaErr").textContent = err.message; }
+});
+
 // ---------- opdatering ----------
 let busy = false;
 async function refresh() {
@@ -391,6 +440,8 @@ async function boot() {
   const q = new URLSearchParams(location.search);
   if (q.get("fejl")) { toast(q.get("fejl"), 5000); history.replaceState(null, "", "/"); }
   const a = await fetch("/api/auth").then(r => r.json()).catch(() => ({ ok: false, required: true }));
+  $("#code").classList.toggle("hidden", !a.totp);
+  $("#code").required = !!a.totp;
   if (!a.ok) { showLogin(); return; }
   showApp();
   await refresh();
