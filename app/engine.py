@@ -68,6 +68,7 @@ class Engine:
             except Exception:
                 log.exception("Kunne ikke læse settings.json – bruger standard")
         self.meta: dict[str, dict] = {}
+        self.events: list[str] = []  # seneste advarsler/fejl, vises i /api/diag
         if self.meta_file.exists():
             try:
                 self.meta = json.loads(self.meta_file.read_text())
@@ -85,6 +86,9 @@ class Engine:
             # Behold forbindelser mens en torrent venter på filvalg (alle filer fravalgt
             # tæller som "færdig", og så ville libtorrent ellers lukke til seeds)
             "close_redundant_connections": False,
+            # Skriv med almindelig pwrite i stedet for mmap. mmap-skrivning kan gå i stå
+            # på NAS-diske og i Docker (download stopper efter få KB).
+            "disk_write_mode": 0,
         }
         self.ses = lt.session(pack)
         self._apply_settings()
@@ -327,6 +331,35 @@ class Engine:
             self.meta.pop(tid, None)
             self._save_meta()
 
+    def diag(self) -> dict:
+        """Fejlsøgning: status pr. torrent og peers' tilstand."""
+        out = []
+        with self.lock:
+            for h in self.ses.get_torrents():
+                s = h.status()
+                peers = h.get_peer_info()
+                out.append({
+                    "name": s.name, "state": str(s.state), "error": s.errc.message() if s.errc.value() else "",
+                    "progress": round(s.progress, 4), "peers": s.num_peers, "seeds": s.num_seeds,
+                    "connect_candidates": s.connect_candidates,
+                    "interested_in_peers": sum(1 for p in peers if p.flags & lt.peer_info.interesting),
+                    "unchoked_by_peers": sum(1 for p in peers if not p.flags & lt.peer_info.remote_choked),
+                    "peers_down_rate": sum(p.payload_down_speed for p in peers),
+                    "paused": bool(s.flags & lt.torrent_flags.paused),
+                    "save_path": s.save_path,
+                })
+        st = self.ses.status() if hasattr(self.ses, "status") else None
+        return {
+            "torrents": out,
+            "listen_port": self.ses.listen_port(),
+            "is_listening": self.ses.is_listening(),
+            "settings": self.get_settings(),
+            "disk_write_mode": self.ses.get_settings().get("disk_write_mode"),
+            "download_rate_limit": self.ses.get_settings().get("download_rate_limit"),
+            "events": self.events[-30:],
+            "disk": self.disk(),
+        }
+
     def disk(self) -> dict:
         u = shutil.disk_usage(self.download_dir)
         return {"total": u.total, "free": u.free, "used": u.used}
@@ -411,8 +444,12 @@ class Engine:
             tmp.replace(self.resume_dir / f"{tid}.fastresume")
         elif isinstance(a, (lt.metadata_received_alert, lt.torrent_finished_alert)):
             a.handle.save_resume_data(lt.save_resume_flags_t.save_info_dict)
-        elif isinstance(a, (lt.torrent_error_alert, lt.file_error_alert)):
-            log.warning("%s", a.message())
+        elif isinstance(a, (lt.torrent_error_alert, lt.file_error_alert,
+                            getattr(lt, "listen_failed_alert", ()), getattr(lt, "tracker_error_alert", ()))):
+            msg = a.message()
+            log.warning("%s", msg)
+            self.events.append(time.strftime("%H:%M:%S ") + msg)
+            del self.events[:-50]
 
     def shutdown(self):
         """Gem resume-data for alle torrents og vent kort på svar."""

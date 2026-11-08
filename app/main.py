@@ -270,6 +270,11 @@ def remove(tid: str, delete_files: bool = False):
     return {"ok": True}
 
 
+@app.get("/api/diag")
+def diag():
+    return engine.diag()
+
+
 @app.get("/api/settings")
 def get_settings():
     return engine.get_settings()
