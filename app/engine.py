@@ -23,7 +23,7 @@ DEFAULT_SETTINGS = {
     "upload_limit_kb": 0,        # 0 = ubegrænset
     "seed_ratio_limit": 1.0,     # 0 = stop straks når hentet, -1 = ingen grænse
     "seed_time_limit_min": 0,    # 0 = ingen tidsgrænse
-    "max_active_downloads": 3,
+    "max_active_downloads": 5,
     "start_paused": False,       # vælg filer før der hentes
     "limit_lan": False,          # gælder grænserne også peers på det lokale netværk?
 }
@@ -203,7 +203,10 @@ class Engine:
         else:
             stage, word, kind = 3, "Seeder", "ready"
         if paused and stage in (1, 2):
-            word, kind = "Sat på pause", "attention"
+            queued = bool(s.flags & lt.torrent_flags.auto_managed)
+            word, kind = ("I kø", "pending") if queued else ("Sat på pause", "attention")
+        if s.flags & lt.torrent_flags.upload_mode and stage in (1, 2):
+            word, kind = "Diskfejl – venter", "problem"
         wanted = s.total_wanted or 0
         done = s.total_wanted_done or 0
         # libtorrent viser et glidende gennemsnit – vis 0 når der ikke hentes/deles
@@ -319,6 +322,7 @@ class Engine:
                 m["seed_override"] = True
                 self._save_meta()
             h.set_flags(lt.torrent_flags.auto_managed)
+            h.unset_flags(lt.torrent_flags.upload_mode)  # fx efter fuld disk
             h.resume()
             h.save_resume_data()
 
@@ -346,6 +350,7 @@ class Engine:
                     "unchoked_by_peers": sum(1 for p in peers if not p.flags & lt.peer_info.remote_choked),
                     "peers_down_rate": sum(p.payload_down_speed for p in peers),
                     "paused": bool(s.flags & lt.torrent_flags.paused),
+                    "upload_mode": bool(s.flags & lt.torrent_flags.upload_mode),
                     "save_path": s.save_path,
                 })
         st = self.ses.status() if hasattr(self.ses, "status") else None
@@ -396,6 +401,12 @@ class Engine:
                             m["name"] = s.name
                             changed = True
                         paused = bool(s.flags & lt.torrent_flags.paused)
+                        # Efter en diskfejl (fx fuld disk) går libtorrent i "upload mode" og
+                        # henter ikke mere. Er der plads igen, så hent videre med det samme.
+                        if s.flags & lt.torrent_flags.upload_mode and not s.is_finished \
+                                and shutil.disk_usage(self.download_dir).free > 1024 ** 3:
+                            h.unset_flags(lt.torrent_flags.upload_mode)
+                            log.info("Henter videre efter diskfejl: %s", s.name)
                         if (s.is_seeding or s.is_finished) and not paused and not m.get("seed_override") \
                                 and not m.get("awaiting_selection") and s.has_metadata:
                             if self._seed_limit_reached(s):

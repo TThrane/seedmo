@@ -23,7 +23,7 @@ Kopiér hele `seedmo`-mappen til NAS'en, fx til `Container/seedmo/app`. Det kan 
 
 Opret også de to mapper, som seedmo skal bruge:
 - `Container/seedmo/config`: indstillinger og huskede torrents
-- `Download/seedmo`: her lander de hentede filer
+- `Downloads/seedmo`: her lander de hentede filer
 
 ### 2. Ret adgangskoden
 Åbn `docker-compose.yml` og skift `skift-mig` ud med din egen adgangskode.

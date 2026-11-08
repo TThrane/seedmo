@@ -14,4 +14,4 @@ services:
       - "51515:51515/udp"
     volumes:
       - /share/Container/seedmo/config:/config
-      - /share/Download/seedmo:/downloads
+      - /share/Downloads/seedmo:/downloads
